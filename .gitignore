@@ -1,0 +1,70 @@
+# Build directories
+build/
+out/
+build-*/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+Makefile
+*.cmake
+!CMakeLists.txt
+!**/CMakeLists.txt
+
+# Generated binaries
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.dis
+
+# Object files
+*.o
+*.obj
+*.a
+*.so
+*.lib
+
+# Debug files
+*.pdb
+*.ilk
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.orig
+
+# Temporary files
+temp/
+tmp/
+
+# Package files
+*.tar.gz
+*.zip
+
+# Python cache (if adding Python tools later)
+__pycache__/
+*.pyc
+
+# Documentation build
+docs/_build/
+docs/html/
+docs/latex/

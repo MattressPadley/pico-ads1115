@@ -46,3 +46,26 @@ release-build:
     @mkdir -p build
     @cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
     @cd build && make -j$(nproc)
+
+    # Monitor serial output from the Pico
+monitor:
+    @echo "Monitoring serial output from Pico..."
+    @echo "Press Ctrl+A then Ctrl+X to exit"
+    @picocom -b 115200 --imap lfcrlf /dev/cu.usbmodem*
+
+# Test build: build, flash, reboot, and monitor
+test-build: build
+    @echo "Test build: flashing and monitoring basic_adc example..."
+    @if [ ! -f "build/basic_adc.uf2" ]; then \
+        echo "Error: basic_adc.uf2 not found in build directory"; \
+        exit 1; \
+    fi
+    @echo "Put your Pico in BOOTSEL mode (hold BOOTSEL while connecting USB)"
+    @echo "Press Enter when ready..."
+    @read
+    @picotool load build/basic_adc.uf2 --force
+    @echo "Flashing complete! Rebooting Pico..."
+    @sleep 2
+    @echo "Starting serial monitor..."
+    @echo "Press Ctrl+A then Ctrl+X to exit monitoring"
+    @picocom -b 115200 --imap lfcrlf /dev/cu.usbmodem*

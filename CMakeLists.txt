@@ -1,8 +1,33 @@
 cmake_minimum_required(VERSION 3.13)
 
-# Include the Pico SDK
-include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
-
+# Include the Pico SDK only if not already available
+if(NOT COMMAND pico_sdk_init)
+    # Check if PICO_SDK_PATH is set, otherwise download to build folder
+    if(NOT DEFINED ENV{PICO_SDK_PATH})
+        set(PICO_SDK_PATH ${CMAKE_CURRENT_BINARY_DIR}/pico-sdk)
+        if(NOT EXISTS ${PICO_SDK_PATH})
+            message(STATUS "Downloading Pico SDK to ${PICO_SDK_PATH}")
+            execute_process(
+                COMMAND git clone --depth 1 --branch 2.1.1 https://github.com/raspberrypi/pico-sdk.git ${PICO_SDK_PATH}
+                RESULT_VARIABLE GIT_RESULT
+            )
+            if(NOT GIT_RESULT EQUAL 0)
+                message(FATAL_ERROR "Failed to download Pico SDK")
+            endif()
+            execute_process(
+                COMMAND git submodule update --init --recursive
+                WORKING_DIRECTORY ${PICO_SDK_PATH}
+                RESULT_VARIABLE GIT_RESULT
+            )
+            if(NOT GIT_RESULT EQUAL 0)
+                message(FATAL_ERROR "Failed to initialize Pico SDK submodules")
+            endif()
+        endif()
+        include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+    else()
+        include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+    endif()
+endif()
 # Project configuration
 project(pico_ads1115 C CXX ASM)
 set(CMAKE_C_STANDARD 11)
@@ -80,12 +105,12 @@ install(DIRECTORY include/
 )
 
 # Package configuration (optional)
-set(ADS1115_VERSION "0.1.0")
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/ads1115-config.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/ads1115-config.cmake"
-    @ONLY
-)
+# set(ADS1115_VERSION "0.1.0")
+# configure_file(
+#     "${CMAKE_CURRENT_SOURCE_DIR}/ads1115-config.cmake.in"
+#     "${CMAKE_CURRENT_BINARY_DIR}/ads1115-config.cmake"
+#     @ONLY
+# )
 
 # Add compile definitions
 target_compile_definitions(ads1115 PRIVATE

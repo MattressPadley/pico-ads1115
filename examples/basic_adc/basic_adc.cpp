@@ -5,17 +5,15 @@
 
 using namespace ADS1115;
 
-// I2C configuration
-#define I2C_INSTANCE i2c0
-#define I2C_SDA_PIN 4
-#define I2C_SCL_PIN 5
-#define I2C_BAUDRATE 100000
-
-// ADS1115 configuration
-#define ADS1115_ADDRESS 0x48
+// Configuration
+constexpr uint8_t ADS1115_ADDRESS = DEFAULT_I2C_ADDRESS;  // 0x48
+constexpr uint SDA_PIN = PICO_DEFAULT_I2C_SDA_PIN;        // GPIO 4
+constexpr uint SCL_PIN = PICO_DEFAULT_I2C_SCL_PIN;        // GPIO 5
+constexpr uint BAUDRATE = 100000;                         // 100 kHz I2C
 
 // Function prototypes
 void setup_hardware();
+void i2c_scan();
 void demonstrate_basic_reading();
 void demonstrate_all_channels();
 void demonstrate_differential_reading();
@@ -23,19 +21,47 @@ void demonstrate_continuous_mode();
 void demonstrate_comparator();
 void print_system_info();
 
-// Global ADS1115 device
-ADS1115Device adc(I2C_INSTANCE, ADS1115_ADDRESS, I2C_SDA_PIN, I2C_SCL_PIN);
+// Global ADS1115 device instance
+ADS1115Device adc(i2c_default, ADS1115_ADDRESS);
 
 int main() {
     // Initialize hardware
     setup_hardware();
     
+    // Wait for serial connection
+    while (!stdio_usb_connected()) {
+        sleep_ms(100);
+    }
+    sleep_ms(1000); // Give time for terminal to connect
+    
     printf("\n=== ADS1115 Basic ADC Example ===\n");
     print_system_info();
     
-    // Initialize the ADS1115
-    printf("\nInitializing ADS1115...\n");
-    Error err = adc.begin(I2C_BAUDRATE);
+    // Initialize I2C hardware (app responsibility, not library)
+    printf("\nInitializing I2C hardware...\n");
+    i2c_init(i2c_default, BAUDRATE);
+    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(SDA_PIN);
+    gpio_pull_up(SCL_PIN);
+    printf("I2C initialized on pins %d (SDA) and %d (SCL) at %d Hz\n", SDA_PIN, SCL_PIN, BAUDRATE);
+    
+    // Perform I2C scan
+    i2c_scan();
+    
+    // Test direct I2C communication first
+    printf("\nTesting direct I2C communication with ADS1115...\n");
+    uint8_t test_data[2];
+    int ret = i2c_read_blocking(i2c_default, ADS1115_ADDRESS, test_data, 2, false);
+    if (ret >= 0) {
+        printf("Direct I2C read successful: 0x%02X 0x%02X\n", test_data[0], test_data[1]);
+    } else {
+        printf("Direct I2C read failed: %d\n", ret);
+    }
+    
+    // Initialize the ADS1115 device (I2C already initialized above)
+    printf("\nInitializing ADS1115 device...\n");
+    Error err = adc.begin();
     if (err != Error::SUCCESS) {
         printf("Failed to initialize ADS1115: %s\n", adc.getErrorString(err));
         return 1;
@@ -46,7 +72,7 @@ int main() {
     
     // Run demonstrations
     while (true) {
-        printf("\n" "=".repeat(50) "\n");
+        printf("\n==================================================\n");
         printf("Choose a demonstration:\n");
         printf("1. Basic single channel reading\n");
         printf("2. Read all channels\n");
@@ -95,9 +121,6 @@ int main() {
 void setup_hardware() {
     // Initialize stdio for USB/UART output
     stdio_init_all();
-    
-    // Wait for USB connection (optional)
-    sleep_ms(2000);
     
     printf("Hardware initialized\n");
 }
@@ -293,12 +316,42 @@ void demonstrate_comparator() {
     }
 }
 
+// I2C scan function
+void i2c_scan() {
+    printf("\nScanning I2C bus for devices...\n");
+    printf("   0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
+    
+    for (int addr = 0; addr < (1 << 7); ++addr) {
+        if (addr % 16 == 0) {
+            printf("%02x ", addr);
+        }
+        
+        // Skip reserved addresses
+        if ((addr & 0x78) == 0 || (addr & 0x78) == 0x78) {
+            printf("   ");
+        } else {
+            uint8_t rxdata;
+            int ret = i2c_read_blocking(i2c_default, addr, &rxdata, 1, false);
+            if (ret >= 0) {
+                printf("%02x ", addr);
+            } else {
+                printf("-- ");
+            }
+        }
+        
+        if (addr % 16 == 15) {
+            printf("\n");
+        }
+    }
+    printf("I2C scan complete.\n\n");
+}
+
 void print_system_info() {
     printf("\nSystem Information:\n");
     printf("  SDK Version: %s\n", PICO_SDK_VERSION_STRING);
-    printf("  I2C Instance: %s\n", I2C_INSTANCE == i2c0 ? "i2c0" : "i2c1");
-    printf("  SDA Pin: %d\n", I2C_SDA_PIN);
-    printf("  SCL Pin: %d\n", I2C_SCL_PIN);
-    printf("  Baudrate: %d Hz\n", I2C_BAUDRATE);
+    printf("  I2C Instance: %s\n", i2c_default == i2c0 ? "i2c0" : "i2c1");
+    printf("  SDA Pin: %d\n", SDA_PIN);
+    printf("  SCL Pin: %d\n", SCL_PIN);
+    printf("  Baudrate: %d Hz\n", BAUDRATE);
     printf("  ADS1115 Address: 0x%02X\n", ADS1115_ADDRESS);
 }

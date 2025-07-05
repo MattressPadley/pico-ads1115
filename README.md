@@ -1,9 +1,10 @@
 # ADS1115 Library for Raspberry Pi Pico
 
-A comprehensive C++ library for interfacing with the ADS1115 16-bit ADC using the Raspberry Pi Pico SDK.
+A comprehensive C++ library for the ADS1115 16-bit ADC with I2C interface, designed for the Raspberry Pi Pico using the **Pre-Initialized I2C Pattern** for robust multi-device support.
 
 ## Features
 
+- **Pre-Initialized I2C Pattern**: Designed for multi-device I2C scenarios
 - **16-bit precision ADC** with 4 input channels
 - **Programmable gain amplifier** (±6.144V to ±0.256V ranges)
 - **Flexible input configuration** (single-ended or differential)
@@ -11,8 +12,8 @@ A comprehensive C++ library for interfacing with the ADS1115 16-bit ADC using th
 - **Configurable data rates** (8 to 860 samples per second)
 - **Comparator functionality** with alert/interrupt support
 - **Comprehensive error handling**
-- **Easy-to-use C++ API** following modern practices
-- **Extensive documentation** and examples
+- **Multi-device I2C support** without conflicts
+- **Thread-safe design**
 
 ## Hardware Requirements
 
@@ -49,35 +50,91 @@ target_link_libraries(your_target ads1115)
 #include "ads1115/ads1115.hpp"
 ```
 
+## Pre-Initialized I2C Pattern
+
+This library implements the **Pre-Initialized I2C Pattern** for better multi-device support:
+
+### The Problem with Traditional Libraries
+```cpp
+// PROBLEMATIC: Each library manages I2C
+ADS1115Device adc1(i2c0, 0x48, 4, 5);  // Initializes I2C
+ADS1115Device adc2(i2c0, 0x49, 4, 5);  // Re-initializes I2C
+adc1.begin(100000);  // Sets baudrate
+adc2.begin(400000);  // Changes baudrate (breaks adc1!)
+```
+
+### The Solution: Pre-Initialized I2C
+```cpp
+// CORRECT: App controls I2C, libraries handle devices
+i2c_init(i2c_default, 100000);
+gpio_set_function(4, GPIO_FUNC_I2C);
+gpio_set_function(5, GPIO_FUNC_I2C);
+gpio_pull_up(4);
+gpio_pull_up(5);
+
+// Create devices (no pin parameters)
+ADS1115Device adc1(i2c_default, 0x48);
+ADS1115Device adc2(i2c_default, 0x49);
+
+// Initialize devices (no baudrate conflicts)
+adc1.begin();
+adc2.begin();
+```
+
 ## Quick Start
 
 ```cpp
 #include "ads1115/ads1115.hpp"
+#include "pico/stdlib.h"
+#include "hardware/i2c.h"
 using namespace ADS1115;
 
-// Initialize the ADS1115
-ADS1115Device adc(i2c0, 0x48, 4, 5);  // I2C instance, address, SDA pin, SCL pin
-
 int main() {
-    // Initialize hardware
     stdio_init_all();
     
-    // Start the ADC
-    Error err = adc.begin(100000);  // 100kHz I2C
-    if (err != Error::SUCCESS) {
+    // Initialize I2C hardware (app responsibility)
+    i2c_init(i2c_default, 100000);
+    gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
+    gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+    
+    // Create and initialize ADS1115 (no I2C parameters)
+    ADS1115Device adc(i2c_default, 0x48);
+    if (adc.begin() != Error::SUCCESS) {
         printf("Failed to initialize ADS1115\n");
         return 1;
     }
     
     // Read a single channel
     ADCReading reading;
-    err = adc.readChannel(ADCChannel::A0, reading);
-    if (err == Error::SUCCESS) {
-        printf("Channel A0: %.6f V (Raw: %d)\n", reading.voltage, reading.raw_value);
+    if (adc.readChannel(ADCChannel::A0, reading) == Error::SUCCESS) {
+        printf("A0: %.3fV (raw: %d)\n", reading.voltage, reading.raw_value);
     }
     
     return 0;
 }
+```
+
+## Multi-Device Example
+
+```cpp
+// Initialize I2C once for all devices
+i2c_init(i2c_default, 100000);
+gpio_set_function(4, GPIO_FUNC_I2C);
+gpio_set_function(5, GPIO_FUNC_I2C);
+gpio_pull_up(4);
+gpio_pull_up(5);
+
+// Create multiple devices on same bus
+ADS1115Device adc1(i2c_default, 0x48);  // ADDR to GND
+ADS1115Device adc2(i2c_default, 0x49);  // ADDR to VDD
+CAP1188Device touch(i2c_default, 0x29); // Touch sensor
+
+// Initialize all devices (no conflicts)
+adc1.begin();
+adc2.begin();
+touch.begin();
 ```
 
 ## API Reference
@@ -87,14 +144,34 @@ int main() {
 #### `ADS1115Device`
 Main class for interfacing with the ADS1115.
 
+**Constructor (v2.x - Pre-Initialized I2C Pattern):**
 ```cpp
-ADS1115Device adc(i2c_inst_t* i2c, uint8_t address, uint sda_pin, uint scl_pin, uint alert_pin = INVALID_PIN);
+ADS1115Device(i2c_inst_t* i2c_instance, 
+              uint8_t device_address = DEFAULT_I2C_ADDRESS,
+              uint alert_pin = 255);
+```
+
+**Migration from v1.x:**
+```cpp
+// Before (v1.x)
+ADS1115Device adc(i2c0, 0x48, 4, 5, 255);  // Pins in constructor
+adc.begin(100000);                          // Baudrate in begin()
+
+// After (v2.x)
+i2c_init(i2c_default, 100000);              // App handles I2C
+gpio_set_function(4, GPIO_FUNC_I2C);
+gpio_set_function(5, GPIO_FUNC_I2C);
+gpio_pull_up(4);
+gpio_pull_up(5);
+
+ADS1115Device adc(i2c_default, 0x48);       // No pins in constructor
+adc.begin();                                // No baudrate in begin()
 ```
 
 ### Key Methods
 
 #### Device Management
-- `Error begin(uint baudrate = 100000)` - Initialize the device
+- `Error begin()` - Initialize the device (I2C must be pre-initialized)
 - `bool isConnected()` - Check if device is responding
 - `Error reset()` - Reset the device to default settings
 - `DeviceStatus getStatus()` - Get current device status
@@ -281,8 +358,33 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Benefits of Pre-Initialized I2C Pattern
+
+✅ **True Multi-Device Support** - No I2C conflicts between libraries  
+✅ **Predictable Behavior** - App controls exactly when I2C is configured  
+✅ **Easier Debugging** - Clear separation between hardware and device setup  
+✅ **Better Performance** - No redundant I2C initialization  
+✅ **Flexible Configuration** - App can optimize I2C settings for all devices  
+✅ **Clean Architecture** - Libraries focus on device communication, not hardware management
+
+## Version History
+
+### v2.0.0 - Pre-Initialized I2C Pattern
+- **BREAKING**: Removed SDA/SCL pin parameters from constructor
+- **BREAKING**: Removed baudrate parameter from `begin()` method
+- Added support for multi-device I2C scenarios
+- Fixed circular dependency bug in device initialization
+- Improved error handling and validation
+- Updated examples to demonstrate new pattern
+
+### v1.x - Traditional Pattern (Deprecated)
+- Library managed I2C initialization
+- Single-device focused design
+- Pin parameters in constructor
+
 ## Acknowledgments
 
 - Based on the Texas Instruments ADS1115 datasheet
 - Inspired by the Adafruit ADS1X15 library
 - Follows the same architectural patterns as the CAP1188 library
+- Pre-Initialized I2C Pattern developed for robust multi-device support

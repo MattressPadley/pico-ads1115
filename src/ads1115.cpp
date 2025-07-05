@@ -5,13 +5,10 @@
 namespace ADS1115 {
 
 ADS1115Device::ADS1115Device(i2c_inst_t* i2c_instance, uint8_t device_address,
-                           uint sda_pin, uint scl_pin, uint alert_pin)
+                           uint alert_pin)
     : _i2c(i2c_instance)
     , _address(device_address)
-    , _sda_pin(sda_pin)
-    , _scl_pin(scl_pin)
     , _alert_pin(alert_pin)
-    , _baudrate(100000)
     , _initialized(false)
     , _current_channel(ADCChannel::A0)
     , _continuous_mode(false)
@@ -33,11 +30,9 @@ ADS1115Device::~ADS1115Device() {
     }
 }
 
-Error ADS1115Device::begin(uint baudrate) {
-    _baudrate = baudrate;
-    
-    // Initialize I2C
-    Error err = _initializeI2C();
+Error ADS1115Device::begin() {
+    // Validate I2C is properly initialized
+    Error err = _validateI2C();
     if (err != Error::SUCCESS) {
         return err;
     }
@@ -58,7 +53,7 @@ Error ADS1115Device::begin(uint baudrate) {
     }
     
     // Initialize alert pin if configured
-    if (_alert_pin < PICO_DEFAULT_GPIO_PIN_COUNT) {
+    if (_alert_pin < 255) {
         err = _initializeAlert();
         if (err != Error::SUCCESS) {
             return err;
@@ -346,7 +341,7 @@ Error ADS1115Device::disableComparator() {
 }
 
 bool ADS1115Device::isAlertActive() {
-    if (_alert_pin >= PICO_DEFAULT_GPIO_PIN_COUNT) {
+    if (_alert_pin >= 255) {
         return false;
     }
     
@@ -476,7 +471,7 @@ Error ADS1115Device::performSelfTest() {
 }
 
 float ADS1115Device::getVoltageRange() const {
-    return getVoltageRange(_config.gain);
+    return ADS1115::getVoltageRange(_config.gain);
 }
 
 float ADS1115Device::getVoltageResolution() const {
@@ -555,12 +550,13 @@ Error ADS1115Device::_configureDefaults() {
     return _updateConfiguration();
 }
 
-Error ADS1115Device::_initializeI2C() {
-    i2c_init(_i2c, _baudrate);
-    gpio_set_function(_sda_pin, GPIO_FUNC_I2C);
-    gpio_set_function(_scl_pin, GPIO_FUNC_I2C);
-    gpio_pull_up(_sda_pin);
-    gpio_pull_up(_scl_pin);
+Error ADS1115Device::_validateI2C() {
+    if (_i2c == nullptr) {
+        return Error::INVALID_PARAMETER;
+    }
+    
+    // For now, just check that I2C instance is not null
+    // The actual device communication will be tested in _verifyDevice()
     return Error::SUCCESS;
 }
 
@@ -638,10 +634,6 @@ uint16_t ADS1115Device::_buildConfigRegister(ADCChannel channel) const {
 }
 
 Error ADS1115Device::_updateConfiguration() {
-    if (!_initialized) {
-        return Error::NOT_INITIALIZED;
-    }
-    
     uint16_t config = _buildConfigRegister();
     return writeConfig(config);
 }
