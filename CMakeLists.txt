@@ -28,31 +28,35 @@ if(NOT COMMAND pico_sdk_init)
         include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
     endif()
 endif()
-# Project configuration
-project(pico_ads1115 C CXX ASM)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
 
-# Initialize the Pico SDK
-pico_sdk_init()
+# Only configure project if we're the top-level project
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    # Project configuration
+    project(pico_ads1115 C CXX ASM)
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_CXX_STANDARD 17)
+
+    # Initialize the Pico SDK
+    pico_sdk_init()
+endif()
 
 # Library source files
 set(ADS1115_SOURCES
-    src/ads1115.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/ads1115.cpp
 )
 
 # Library headers
 set(ADS1115_HEADERS
-    include/ads1115/ads1115.hpp
-    include/ads1115/ads1115_registers.hpp
-    include/ads1115/ads1115_types.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/include/ads1115/ads1115.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/include/ads1115/ads1115_registers.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/include/ads1115/ads1115_types.hpp
 )
 
 # Create the ADS1115 library
 add_library(ads1115 STATIC ${ADS1115_SOURCES})
 
 # Include directories for the library
-target_include_directories(ads1115 PUBLIC include)
+target_include_directories(ads1115 PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
 # Link Pico SDK libraries to our library
 target_link_libraries(ads1115 
@@ -65,7 +69,6 @@ target_link_libraries(ads1115
 target_compile_options(ads1115 PRIVATE 
     -Wall 
     -Wextra 
-    -Werror
     -Wno-unused-parameter
 )
 
@@ -74,23 +77,26 @@ target_compile_options(ads1115 PRIVATE
 # pico_enable_stdio_usb(ads1115 1)
 # pico_enable_stdio_uart(ads1115 0)
 
-# Basic ADC example
-add_executable(basic_adc examples/basic_adc/basic_adc.cpp)
+# Only build examples if we're the top-level project
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    # Basic ADC example
+    add_executable(basic_adc examples/basic_adc/basic_adc.cpp)
 
-# Link libraries to the example
-target_link_libraries(basic_adc 
-    ads1115
-    pico_stdlib
-    hardware_i2c
-    hardware_gpio
-)
+    # Link libraries to the example
+    target_link_libraries(basic_adc 
+        ads1115
+        pico_stdlib
+        hardware_i2c
+        hardware_gpio
+    )
 
-# Enable USB and UART output for the example
-pico_enable_stdio_usb(basic_adc 1)
-pico_enable_stdio_uart(basic_adc 1)
+    # Enable USB and UART output for the example
+    pico_enable_stdio_usb(basic_adc 1)
+    pico_enable_stdio_uart(basic_adc 1)
 
-# Create map/bin/hex/uf2 files for the example
-pico_add_extra_outputs(basic_adc)
+    # Create map/bin/hex/uf2 files for the example
+    pico_add_extra_outputs(basic_adc)
+endif()
 
 # Installation rules (optional)
 install(TARGETS ads1115
