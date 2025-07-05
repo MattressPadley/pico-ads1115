@@ -1,8 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include "pico/stdlib.h"
+#include "hardware/i2c.h"
 
 namespace ADS1115 {
+
 
 // ADC channel enumeration
 enum class ADCChannel : uint8_t {
@@ -195,6 +198,49 @@ constexpr int16_t voltageToRaw(float voltage, GainAmplifier gain) {
     if (raw_float < -32768.0f) return -32768;
     return static_cast<int16_t>(raw_float);
 }
+
+// Device configuration structure for external hardware setup
+struct DeviceConfig {
+    // I2C Hardware Configuration
+    i2c_inst_t* i2c_instance = nullptr;        // I2C instance (i2c0, i2c1)
+    uint8_t device_address = 0x48;              // I2C device address (default ADS1115 address)
+    uint32_t i2c_baudrate = 100000;             // I2C clock speed in Hz
+    uint sda_pin = PICO_DEFAULT_I2C_SDA_PIN;    // SDA pin number
+    uint scl_pin = PICO_DEFAULT_I2C_SCL_PIN;    // SCL pin number
+    bool enable_pullups = true;                  // Enable internal pull-up resistors
+    
+    // Alert/Interrupt Configuration
+    uint alert_pin = 255;                       // Alert pin (255 = disabled)
+    bool alert_enabled = false;                 // Enable alert functionality
+    
+    // Power Management
+    uint16_t power_on_delay_ms = 25;            // Power-on delay in milliseconds
+    uint16_t conversion_delay_ms = 10;          // Conversion delay in milliseconds
+    
+    // Default ADC Configuration
+    ADCConfig default_adc_config = ADCConfig(); // Default ADC settings
+    
+    // I2C Communication Settings
+    uint8_t i2c_timeout_ms = 100;               // I2C timeout in milliseconds
+    uint8_t max_retries = 3;                    // Maximum I2C retry attempts
+    
+    // Validation flags
+    bool auto_init_i2c = false;                 // Automatically initialize I2C hardware
+    bool validate_connections = true;            // Validate I2C connections on begin()
+    
+    DeviceConfig() = default;
+    
+    // Constructor with basic I2C settings
+    DeviceConfig(i2c_inst_t* i2c_inst, uint8_t addr = 0x48, 
+                 uint sda = PICO_DEFAULT_I2C_SDA_PIN, uint scl = PICO_DEFAULT_I2C_SCL_PIN)
+        : i2c_instance(i2c_inst), device_address(addr), sda_pin(sda), scl_pin(scl) {}
+    
+    // Constructor with full configuration
+    DeviceConfig(i2c_inst_t* i2c_inst, uint8_t addr, uint32_t baudrate,
+                 uint sda, uint scl, uint alert = 255)
+        : i2c_instance(i2c_inst), device_address(addr), i2c_baudrate(baudrate),
+          sda_pin(sda), scl_pin(scl), alert_pin(alert) {}
+};
 
 // String conversion helpers
 const char* channelToString(ADCChannel channel);

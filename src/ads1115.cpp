@@ -22,6 +22,24 @@ ADS1115Device::ADS1115Device(i2c_inst_t* i2c_instance, uint8_t device_address,
     _config = ADCConfig();
 }
 
+ADS1115Device::ADS1115Device(const DeviceConfig& config)
+    : _i2c(config.i2c_instance)
+    , _address(config.device_address)
+    , _alert_pin(config.alert_pin)
+    , _initialized(false)
+    , _current_channel(ADCChannel::A0)
+    , _continuous_mode(false)
+    , _conversion_in_progress(false)
+    , _conversion_callback(nullptr)
+    , _alert_callback(nullptr)
+    , _error_callback(nullptr)
+    , _conversion_count(0)
+    , _device_config(config)
+{
+    // Initialize configuration with defaults from DeviceConfig
+    _config = config.default_adc_config;
+}
+
 ADS1115Device::~ADS1115Device() {
     if (_initialized) {
         // Stop continuous mode if active
@@ -62,6 +80,20 @@ Error ADS1115Device::begin() {
     
     _initialized = true;
     return Error::SUCCESS;
+}
+
+Error ADS1115Device::begin(const DeviceConfig& config) {
+    // Validate the device configuration
+    Error err = _validateDeviceConfig(config);
+    if (err != Error::SUCCESS) {
+        return err;
+    }
+    
+    // Store configuration
+    _device_config = config;
+    
+    // Initialize from device configuration
+    return _initializeFromDeviceConfig(config);
 }
 
 Error ADS1115Device::reset() {
@@ -108,7 +140,7 @@ DeviceStatus ADS1115Device::getStatus() {
     return status;
 }
 
-Error ADS1115Device::setConfiguration(const ADCConfig& config) {
+Error ADS1115Device::updateConfiguration(const ADCConfig& config) {
     if (!_initialized) {
         return Error::NOT_INITIALIZED;
     }
@@ -274,7 +306,7 @@ Error ADS1115Device::readChannels(const ADCChannel* channels, size_t count, ADCR
     return Error::SUCCESS;
 }
 
-Error ADS1115Device::setGain(GainAmplifier gain) {
+Error ADS1115Device::updateGain(GainAmplifier gain) {
     if (!_isValidGain(gain)) {
         return Error::INVALID_PARAMETER;
     }
@@ -287,7 +319,7 @@ GainAmplifier ADS1115Device::getGain() const {
     return _config.gain;
 }
 
-Error ADS1115Device::setDataRate(DataRate rate) {
+Error ADS1115Device::updateDataRate(DataRate rate) {
     if (!_isValidDataRate(rate)) {
         return Error::INVALID_PARAMETER;
     }
@@ -300,7 +332,7 @@ DataRate ADS1115Device::getDataRate() const {
     return _config.data_rate;
 }
 
-Error ADS1115Device::setOperatingMode(OperatingMode mode) {
+Error ADS1115Device::updateOperatingMode(OperatingMode mode) {
     _config.mode = mode;
     return _updateConfiguration();
 }
@@ -309,13 +341,13 @@ OperatingMode ADS1115Device::getOperatingMode() const {
     return _config.mode;
 }
 
-Error ADS1115Device::setComparator(ComparatorMode mode, ComparatorPolarity polarity) {
+Error ADS1115Device::updateComparator(ComparatorMode mode, ComparatorPolarity polarity) {
     _config.comparator_mode = mode;
     _config.comparator_polarity = polarity;
     return _updateConfiguration();
 }
 
-Error ADS1115Device::setThresholds(float low_threshold, float high_threshold) {
+Error ADS1115Device::updateThresholds(float low_threshold, float high_threshold) {
     if (low_threshold >= high_threshold) {
         return Error::INVALID_PARAMETER;
     }
@@ -326,8 +358,8 @@ Error ADS1115Device::setThresholds(float low_threshold, float high_threshold) {
     return _setRawThresholds(low_raw, high_raw);
 }
 
-Error ADS1115Device::setThresholds(const ThresholdConfig& config) {
-    return setThresholds(config.low_threshold, config.high_threshold);
+Error ADS1115Device::updateThresholds(const ThresholdConfig& config) {
+    return updateThresholds(config.low_threshold, config.high_threshold);
 }
 
 Error ADS1115Device::enableComparator(ComparatorQueue queue) {
@@ -355,17 +387,17 @@ Error ADS1115Device::clearAlert() {
     return readRegister(REG_CONVERSION, dummy);
 }
 
-Error ADS1115Device::setComparatorLatch(ComparatorLatch latch) {
+Error ADS1115Device::updateComparatorLatch(ComparatorLatch latch) {
     _config.comparator_latch = latch;
     return _updateConfiguration();
 }
 
-Error ADS1115Device::setComparatorQueue(ComparatorQueue queue) {
+Error ADS1115Device::updateComparatorQueue(ComparatorQueue queue) {
     _config.comparator_queue = queue;
     return _updateConfiguration();
 }
 
-Error ADS1115Device::setComparatorPolarity(ComparatorPolarity polarity) {
+Error ADS1115Device::updateComparatorPolarity(ComparatorPolarity polarity) {
     _config.comparator_polarity = polarity;
     return _updateConfiguration();
 }
@@ -420,15 +452,15 @@ Error ADS1115Device::readContinuous(ADCReading& reading) {
     return Error::SUCCESS;
 }
 
-void ADS1115Device::setConversionCallback(ConversionCallback callback) {
+void ADS1115Device::updateConversionCallback(ConversionCallback callback) {
     _conversion_callback = callback;
 }
 
-void ADS1115Device::setAlertCallback(AlertCallback callback) {
+void ADS1115Device::updateAlertCallback(AlertCallback callback) {
     _alert_callback = callback;
 }
 
-void ADS1115Device::setErrorCallback(ErrorCallback callback) {
+void ADS1115Device::updateErrorCallback(ErrorCallback callback) {
     _error_callback = callback;
 }
 
@@ -892,6 +924,77 @@ float getMinVoltage(GainAmplifier gain) {
 bool isVoltageInRange(float voltage, GainAmplifier gain) {
     float range = getVoltageRange(gain);
     return (voltage >= -range && voltage <= range);
+}
+
+// DeviceConfig helper method implementations
+Error ADS1115Device::_validateDeviceConfig(const DeviceConfig& config) {
+    if (!validateDeviceConfig(config)) {
+        return Error::INVALID_PARAMETER;
+    }
+    return Error::SUCCESS;
+}
+
+Error ADS1115Device::_setupI2CHardware(const DeviceConfig& config) {
+    if (config.auto_init_i2c) {
+        // Initialize I2C hardware
+        i2c_init(config.i2c_instance, config.i2c_baudrate);
+        gpio_set_function(config.sda_pin, GPIO_FUNC_I2C);
+        gpio_set_function(config.scl_pin, GPIO_FUNC_I2C);
+        
+        if (config.enable_pullups) {
+            gpio_pull_up(config.sda_pin);
+            gpio_pull_up(config.scl_pin);
+        }
+    }
+    return Error::SUCCESS;
+}
+
+Error ADS1115Device::_initializeFromDeviceConfig(const DeviceConfig& config) {
+    // Update internal state with configuration
+    _i2c = config.i2c_instance;
+    _address = config.device_address;
+    _alert_pin = config.alert_pin;
+    _config = config.default_adc_config;
+    
+    // Setup I2C hardware if requested
+    Error err = _setupI2CHardware(config);
+    if (err != Error::SUCCESS) {
+        return err;
+    }
+    
+    // Wait for device to be ready
+    sleep_ms(config.power_on_delay_ms);
+    
+    // Validate I2C is properly initialized
+    if (config.validate_connections) {
+        err = _validateI2C();
+        if (err != Error::SUCCESS) {
+            return err;
+        }
+    }
+    
+    // Verify device is present
+    err = _verifyDevice();
+    if (err != Error::SUCCESS) {
+        return err;
+    }
+    
+    // Configure with the default ADC configuration
+    err = _updateConfiguration();
+    if (err != Error::SUCCESS) {
+        return err;
+    }
+    
+    // Initialize alert pin if configured
+    if (config.alert_enabled && _alert_pin < 255) {
+        err = _initializeAlert();
+        if (err != Error::SUCCESS) {
+            return err;
+        }
+    }
+    
+    _initialized = true;
+    return Error::SUCCESS;
 }
 
 } // namespace ADS1115

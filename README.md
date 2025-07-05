@@ -5,12 +5,14 @@ A comprehensive C++ library for the ADS1115 16-bit ADC with I2C interface, desig
 ## Features
 
 - **Pre-Initialized I2C Pattern**: Designed for multi-device I2C scenarios
+- **External Hardware Configuration**: Configure I2C, pins, and settings outside the library
 - **16-bit precision ADC** with 4 input channels
 - **Programmable gain amplifier** (±6.144V to ±0.256V ranges)
 - **Flexible input configuration** (single-ended or differential)
 - **Multiple operating modes** (single-shot and continuous)
 - **Configurable data rates** (8 to 860 samples per second)
 - **Comparator functionality** with alert/interrupt support
+- **Runtime configuration updates** with intuitive `update*()` methods
 - **Comprehensive error handling**
 - **Multi-device I2C support** without conflicts
 - **Thread-safe design**
@@ -81,6 +83,129 @@ adc1.begin();
 adc2.begin();
 ```
 
+## External Hardware Configuration
+
+In addition to the Pre-Initialized I2C Pattern, this library supports **External Hardware Configuration** using the `DeviceConfig` structure. This allows you to configure all hardware settings outside the library for maximum flexibility.
+
+### Traditional vs. External Configuration
+
+**Traditional approach (still supported):**
+```cpp
+// App handles I2C initialization
+i2c_init(i2c_default, 100000);
+gpio_set_function(4, GPIO_FUNC_I2C);
+gpio_set_function(5, GPIO_FUNC_I2C);
+gpio_pull_up(4);
+gpio_pull_up(5);
+
+// Create device with minimal configuration
+ADS1115Device adc(i2c_default, 0x48);
+adc.begin();
+```
+
+**External configuration approach (new):**
+```cpp
+#include "ads1115/ads1115_config.hpp"
+
+// Configure everything externally
+DeviceConfig config;
+config.i2c_instance = i2c0;
+config.device_address = 0x48;
+config.i2c_baudrate = 400000;           // 400kHz I2C
+config.sda_pin = 4;
+config.scl_pin = 5;
+config.enable_pullups = true;
+config.alert_pin = 22;                  // Use GPIO 22 for alerts
+config.alert_enabled = true;
+config.auto_init_i2c = true;            // Library handles I2C init
+config.validate_connections = true;
+config.power_on_delay_ms = 50;          // Custom power-on delay
+
+// Configure default ADC settings
+config.default_adc_config.gain = GainAmplifier::GAIN_FOUR;
+config.default_adc_config.data_rate = DataRate::SPS_250;
+config.default_adc_config.mode = OperatingMode::SINGLE_SHOT;
+
+// Create and initialize with external configuration
+ADS1115Device adc(config);
+Error err = adc.begin(config);          // All hardware configured automatically
+```
+
+### DeviceConfig Structure
+
+The `DeviceConfig` structure provides comprehensive hardware configuration:
+
+```cpp
+struct DeviceConfig {
+    // I2C Hardware Configuration
+    i2c_inst_t* i2c_instance = nullptr;        // I2C instance (i2c0, i2c1)
+    uint8_t device_address = 0x48;              // I2C device address
+    uint32_t i2c_baudrate = 100000;             // I2C clock speed in Hz
+    uint sda_pin = PICO_DEFAULT_I2C_SDA_PIN;    // SDA pin number
+    uint scl_pin = PICO_DEFAULT_I2C_SCL_PIN;    // SCL pin number
+    bool enable_pullups = true;                  // Enable internal pull-up resistors
+    
+    // Alert/Interrupt Configuration
+    uint alert_pin = 255;                       // Alert pin (255 = disabled)
+    bool alert_enabled = false;                 // Enable alert functionality
+    
+    // Power Management
+    uint16_t power_on_delay_ms = 25;            // Power-on delay in milliseconds
+    uint16_t conversion_delay_ms = 10;          // Conversion delay in milliseconds
+    
+    // Default ADC Configuration
+    ADCConfig default_adc_config = ADCConfig(); // Default ADC settings
+    
+    // I2C Communication Settings
+    uint8_t i2c_timeout_ms = 100;               // I2C timeout in milliseconds
+    uint8_t max_retries = 3;                    // Maximum I2C retry attempts
+    
+    // Validation flags
+    bool auto_init_i2c = false;                 // Automatically initialize I2C hardware
+    bool validate_connections = true;            // Validate I2C connections on begin()
+};
+```
+
+### Configuration Examples
+
+**High-speed I2C with alert:**
+```cpp
+DeviceConfig high_speed_config;
+high_speed_config.i2c_instance = i2c1;
+high_speed_config.i2c_baudrate = 1000000;    // 1MHz I2C
+high_speed_config.sda_pin = 6;
+high_speed_config.scl_pin = 7;
+high_speed_config.alert_pin = 15;
+high_speed_config.alert_enabled = true;
+high_speed_config.auto_init_i2c = true;
+```
+
+**Multiple devices with different settings:**
+```cpp
+// Fast ADC for data acquisition
+DeviceConfig fast_adc_config;
+fast_adc_config.i2c_instance = i2c0;
+fast_adc_config.device_address = 0x48;
+fast_adc_config.i2c_baudrate = 400000;
+fast_adc_config.default_adc_config.data_rate = DataRate::SPS_860;
+fast_adc_config.auto_init_i2c = true;
+
+// Precise ADC for measurements
+DeviceConfig precise_adc_config;
+precise_adc_config.i2c_instance = i2c0;
+precise_adc_config.device_address = 0x49;
+precise_adc_config.i2c_baudrate = 100000;    // Slower for precision
+precise_adc_config.default_adc_config.data_rate = DataRate::SPS_8;
+precise_adc_config.default_adc_config.gain = GainAmplifier::GAIN_SIXTEEN;
+precise_adc_config.power_on_delay_ms = 100;  // Longer stabilization
+
+ADS1115Device fast_adc(fast_adc_config);
+ADS1115Device precise_adc(precise_adc_config);
+
+fast_adc.begin(fast_adc_config);
+precise_adc.begin(precise_adc_config);
+```
+
 ## Quick Start
 
 ```cpp
@@ -144,11 +269,15 @@ touch.begin();
 #### `ADS1115Device`
 Main class for interfacing with the ADS1115.
 
-**Constructor (v2.x - Pre-Initialized I2C Pattern):**
+**Constructors (v2.x - Pre-Initialized I2C Pattern):**
 ```cpp
+// Traditional constructor
 ADS1115Device(i2c_inst_t* i2c_instance, 
               uint8_t device_address = DEFAULT_I2C_ADDRESS,
               uint alert_pin = 255);
+
+// External configuration constructor (v2.1+)
+ADS1115Device(const DeviceConfig& config);
 ```
 
 **Migration from v1.x:**
@@ -172,6 +301,7 @@ adc.begin();                                // No baudrate in begin()
 
 #### Device Management
 - `Error begin()` - Initialize the device (I2C must be pre-initialized)
+- `Error begin(const DeviceConfig& config)` - Initialize with external configuration
 - `bool isConnected()` - Check if device is responding
 - `Error reset()` - Reset the device to default settings
 - `DeviceStatus getStatus()` - Get current device status
@@ -182,10 +312,11 @@ adc.begin();                                // No baudrate in begin()
 - `Error readAllChannels(ADCReading readings[4])` - Read all 4 channels
 - `Error readDifferential(ADCChannel diff_channel, ADCReading& reading)` - Read differential pair
 
-#### Configuration
-- `Error setGain(GainAmplifier gain)` - Set programmable gain amplifier
-- `Error setDataRate(DataRate rate)` - Set sampling rate
-- `Error setOperatingMode(OperatingMode mode)` - Set continuous or single-shot mode
+#### Configuration (Runtime Updates)
+- `Error updateGain(GainAmplifier gain)` - Update programmable gain amplifier
+- `Error updateDataRate(DataRate rate)` - Update sampling rate
+- `Error updateOperatingMode(OperatingMode mode)` - Update continuous or single-shot mode
+- `Error updateConfiguration(const ADCConfig& config)` - Update entire ADC configuration
 
 #### Continuous Mode
 - `Error startContinuousMode(ADCChannel channel)` - Start continuous conversions
@@ -193,10 +324,17 @@ adc.begin();                                // No baudrate in begin()
 - `Error readContinuous(ADCReading& reading)` - Read from continuous mode
 
 #### Comparator/Alert
-- `Error setThresholds(float low, float high)` - Set alert thresholds
+- `Error updateThresholds(float low, float high)` - Update alert thresholds
+- `Error updateThresholds(const ThresholdConfig& config)` - Update thresholds with config
 - `Error enableComparator(ComparatorQueue queue)` - Enable comparator
+- `Error updateComparator(ComparatorMode mode, ComparatorPolarity polarity)` - Update comparator settings
 - `bool isAlertActive()` - Check if alert is active
 - `Error clearAlert()` - Clear alert condition
+
+#### Callbacks
+- `void updateConversionCallback(ConversionCallback callback)` - Set conversion complete callback
+- `void updateAlertCallback(AlertCallback callback)` - Set alert callback
+- `void updateErrorCallback(ErrorCallback callback)` - Set error callback
 
 ### Enums and Types
 
@@ -241,6 +379,34 @@ struct ADCReading {
 };
 ```
 
+#### `DeviceConfig` (v2.1+)
+```cpp
+struct DeviceConfig {
+    // I2C Hardware Configuration
+    i2c_inst_t* i2c_instance = nullptr;
+    uint8_t device_address = 0x48;
+    uint32_t i2c_baudrate = 100000;
+    uint sda_pin = PICO_DEFAULT_I2C_SDA_PIN;
+    uint scl_pin = PICO_DEFAULT_I2C_SCL_PIN;
+    bool enable_pullups = true;
+    
+    // Alert/Interrupt Configuration
+    uint alert_pin = 255;              // 255 = disabled
+    bool alert_enabled = false;
+    
+    // Power Management
+    uint16_t power_on_delay_ms = 25;
+    uint16_t conversion_delay_ms = 10;
+    
+    // Default ADC Configuration
+    ADCConfig default_adc_config = ADCConfig();
+    
+    // Validation flags
+    bool auto_init_i2c = false;        // Auto-initialize I2C hardware
+    bool validate_connections = true;  // Validate I2C on begin()
+};
+```
+
 ## Examples
 
 ### Basic Channel Reading
@@ -281,8 +447,8 @@ adc.stopContinuousMode();
 
 ### Comparator/Alert
 ```cpp
-// Set thresholds
-adc.setThresholds(1.0f, 3.0f);  // Low: 1V, High: 3V
+// Update thresholds
+adc.updateThresholds(1.0f, 3.0f);  // Low: 1V, High: 3V
 
 // Enable comparator
 adc.enableComparator(ComparatorQueue::ASSERT_AFTER_ONE);
@@ -293,6 +459,41 @@ adc.readChannel(ADCChannel::A0, reading);
 if (adc.isAlertActive()) {
     printf("Alert! Voltage outside thresholds: %.6f V\n", reading.voltage);
     adc.clearAlert();
+}
+```
+
+### External Configuration Example
+```cpp
+#include "ads1115/ads1115_config.hpp"
+
+// Create configuration for high-speed data acquisition
+DeviceConfig fast_config;
+fast_config.i2c_instance = i2c0;
+fast_config.device_address = 0x48;
+fast_config.i2c_baudrate = 400000;                    // Fast I2C
+fast_config.sda_pin = 4;
+fast_config.scl_pin = 5;
+fast_config.alert_pin = 22;
+fast_config.alert_enabled = true;
+fast_config.auto_init_i2c = true;                     // Auto-init I2C
+fast_config.default_adc_config.data_rate = DataRate::SPS_860;  // Fastest sampling
+fast_config.default_adc_config.gain = GainAmplifier::GAIN_TWO; // ±2.048V range
+
+// Create and initialize device
+ADS1115Device fast_adc(fast_config);
+Error err = fast_adc.begin(fast_config);
+
+if (err == Error::SUCCESS) {
+    printf("Fast ADC initialized successfully!\n");
+    
+    // Runtime configuration updates
+    fast_adc.updateGain(GainAmplifier::GAIN_FOUR);     // Switch to ±1.024V
+    fast_adc.updateDataRate(DataRate::SPS_475);        // Reduce noise
+    
+    // Read with new settings
+    ADCReading reading;
+    fast_adc.readChannel(ADCChannel::A0, reading);
+    printf("Updated reading: %.6f V\n", reading.voltage);
 }
 ```
 
@@ -368,6 +569,25 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ✅ **Clean Architecture** - Libraries focus on device communication, not hardware management
 
 ## Version History
+
+### v2.1.0 - External Hardware Configuration (Current)
+- **NEW**: Added `DeviceConfig` structure for external hardware configuration
+- **NEW**: Added `DeviceConfig` constructor for flexible initialization
+- **NEW**: Added `begin(DeviceConfig)` method for external configuration
+- **BREAKING**: Renamed all `set*()` methods to `update*()` for better semantics
+  - `setGain()` → `updateGain()`
+  - `setDataRate()` → `updateDataRate()`
+  - `setOperatingMode()` → `updateOperatingMode()`
+  - `setThresholds()` → `updateThresholds()`
+  - `setConfiguration()` → `updateConfiguration()`
+  - All callback methods now use `update*()` naming
+- **NEW**: Added `ads1115_config.hpp` with configuration constants and validation
+- **NEW**: Support for automatic I2C hardware initialization
+- **NEW**: Configurable power management and timing settings
+- **NEW**: Enhanced alert/interrupt pin configuration
+- **NEW**: Built-in configuration validation
+- Improved documentation with comprehensive examples
+- Maintains full backward compatibility for existing constructors and `begin()`
 
 ### v2.0.0 - Pre-Initialized I2C Pattern
 - **BREAKING**: Removed SDA/SCL pin parameters from constructor

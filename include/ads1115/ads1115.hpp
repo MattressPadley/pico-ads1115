@@ -2,6 +2,7 @@
 
 #include "ads1115_registers.hpp"
 #include "ads1115_types.hpp"
+#include "ads1115_config.hpp"
 
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
@@ -11,20 +12,23 @@ namespace ADS1115 {
 
 class ADS1115Device {
 public:
-    // Constructor
+    // Constructors
     explicit ADS1115Device(i2c_inst_t* i2c_instance, 
                           uint8_t device_address = DEFAULT_I2C_ADDRESS,
                           uint alert_pin = 255); // Invalid pin = no alert
+    
+    explicit ADS1115Device(const DeviceConfig& config);
 
     // Destructor
     ~ADS1115Device();
 
     // Device initialization and management
     Error begin();
+    Error begin(const DeviceConfig& config);
     Error reset();
     bool isConnected();
     DeviceStatus getStatus();
-    Error setConfiguration(const ADCConfig& config);
+    Error updateConfiguration(const ADCConfig& config);
     ADCConfig getConfiguration() const;
 
     // ADC reading functions
@@ -43,26 +47,26 @@ public:
     Error readChannels(const ADCChannel* channels, size_t count, ADCReading* readings);
     
     // Configuration functions
-    Error setGain(GainAmplifier gain);
+    Error updateGain(GainAmplifier gain);
     GainAmplifier getGain() const;
-    Error setDataRate(DataRate rate);
+    Error updateDataRate(DataRate rate);
     DataRate getDataRate() const;
-    Error setOperatingMode(OperatingMode mode);
+    Error updateOperatingMode(OperatingMode mode);
     OperatingMode getOperatingMode() const;
     
     // Comparator and alert functions
-    Error setComparator(ComparatorMode mode, ComparatorPolarity polarity = ComparatorPolarity::ACTIVE_LOW);
-    Error setThresholds(float low_threshold, float high_threshold);
-    Error setThresholds(const ThresholdConfig& config);
+    Error updateComparator(ComparatorMode mode, ComparatorPolarity polarity = ComparatorPolarity::ACTIVE_LOW);
+    Error updateThresholds(float low_threshold, float high_threshold);
+    Error updateThresholds(const ThresholdConfig& config);
     Error enableComparator(ComparatorQueue queue = ComparatorQueue::ASSERT_AFTER_ONE);
     Error disableComparator();
     bool isAlertActive();
     Error clearAlert();
     
     // Advanced comparator configuration
-    Error setComparatorLatch(ComparatorLatch latch);
-    Error setComparatorQueue(ComparatorQueue queue);
-    Error setComparatorPolarity(ComparatorPolarity polarity);
+    Error updateComparatorLatch(ComparatorLatch latch);
+    Error updateComparatorQueue(ComparatorQueue queue);
+    Error updateComparatorPolarity(ComparatorPolarity polarity);
     
     // Continuous mode functions
     Error startContinuousMode(ADCChannel channel);
@@ -70,9 +74,9 @@ public:
     Error readContinuous(ADCReading& reading);
     
     // Callback functions
-    void setConversionCallback(ConversionCallback callback);
-    void setAlertCallback(AlertCallback callback);
-    void setErrorCallback(ErrorCallback callback);
+    void updateConversionCallback(ConversionCallback callback);
+    void updateAlertCallback(AlertCallback callback);
+    void updateErrorCallback(ErrorCallback callback);
     
     // Calibration and utility functions
     Error calibrate();
@@ -120,11 +124,19 @@ private:
     absolute_time_t _last_conversion_time;
     uint32_t _conversion_count;
     
+    // Device configuration (when using DeviceConfig constructor)
+    DeviceConfig _device_config;
+    
     // Internal helper functions
     Error _verifyDevice();
     Error _configureDefaults();
     Error _validateI2C();
     Error _initializeAlert();
+    
+    // DeviceConfig helper functions
+    Error _initializeFromDeviceConfig(const DeviceConfig& config);
+    Error _validateDeviceConfig(const DeviceConfig& config);
+    Error _setupI2CHardware(const DeviceConfig& config);
     
     // I2C communication helpers
     Error _i2cWrite(uint8_t reg, uint16_t value);

@@ -19,10 +19,15 @@ void demonstrate_all_channels();
 void demonstrate_differential_reading();
 void demonstrate_continuous_mode();
 void demonstrate_comparator();
+void demonstrate_external_configuration();
 void print_system_info();
 
-// Global ADS1115 device instance
+// Global ADS1115 device instance (traditional method)
 ADS1115Device adc(i2c_default, ADS1115_ADDRESS);
+
+// Alternative: Using DeviceConfig for external configuration
+DeviceConfig device_config;
+ADS1115Device adc_configured(device_config);
 
 int main() {
     // Initialize hardware
@@ -79,7 +84,8 @@ int main() {
         printf("3. Differential reading\n");
         printf("4. Continuous mode\n");
         printf("5. Comparator demo\n");
-        printf("6. Print device status\n");
+        printf("6. External configuration demo\n");
+        printf("7. Print device status\n");
         printf("0. Run all demos in sequence\n");
         printf("Press any key to continue...\n");
         
@@ -88,7 +94,7 @@ int main() {
         
         // For this example, we'll cycle through all demos
         static int demo_counter = 0;
-        switch (demo_counter % 6) {
+        switch (demo_counter % 7) {
             case 0:
                 demonstrate_basic_reading();
                 break;
@@ -105,6 +111,9 @@ int main() {
                 demonstrate_comparator();
                 break;
             case 5:
+                demonstrate_external_configuration();
+                break;
+            case 6:
                 adc.printStatus();
                 printf("\n");
                 adc.printConfiguration();
@@ -151,7 +160,7 @@ void demonstrate_basic_reading() {
     };
     
     for (auto gain : gains) {
-        adc.setGain(gain);
+        adc.updateGain(gain);
         sleep_ms(100);  // Allow settling time
         
         err = adc.readChannel(ADCChannel::A0, reading);
@@ -162,7 +171,7 @@ void demonstrate_basic_reading() {
     }
     
     // Restore default gain
-    adc.setGain(GainAmplifier::GAIN_TWO);
+    adc.updateGain(GainAmplifier::GAIN_TWO);
 }
 
 void demonstrate_all_channels() {
@@ -275,7 +284,7 @@ void demonstrate_comparator() {
     printf("  Low threshold: %.3f V\n", low_threshold);
     printf("  High threshold: %.3f V\n", high_threshold);
     
-    Error err = adc.setThresholds(low_threshold, high_threshold);
+    Error err = adc.updateThresholds(low_threshold, high_threshold);
     if (err != Error::SUCCESS) {
         printf("Failed to set thresholds: %s\n", adc.getErrorString(err));
         return;
@@ -354,4 +363,77 @@ void print_system_info() {
     printf("  SCL Pin: %d\n", SCL_PIN);
     printf("  Baudrate: %d Hz\n", BAUDRATE);
     printf("  ADS1115 Address: 0x%02X\n", ADS1115_ADDRESS);
+}
+
+void demonstrate_external_configuration() {
+    printf("\n--- External Configuration Demonstration ---\n");
+    
+    // Create a custom device configuration
+    DeviceConfig custom_config;
+    custom_config.i2c_instance = i2c_default;
+    custom_config.device_address = 0x48;
+    custom_config.i2c_baudrate = 400000;  // 400kHz instead of default 100kHz
+    custom_config.sda_pin = PICO_DEFAULT_I2C_SDA_PIN;
+    custom_config.scl_pin = PICO_DEFAULT_I2C_SCL_PIN;
+    custom_config.enable_pullups = true;
+    custom_config.alert_pin = 22;  // Use GPIO 22 for alert
+    custom_config.alert_enabled = true;
+    custom_config.power_on_delay_ms = 50;  // Longer power-on delay
+    custom_config.auto_init_i2c = false;  // Don't auto-initialize I2C (already done)
+    custom_config.validate_connections = true;
+    
+    // Configure default ADC settings
+    custom_config.default_adc_config.gain = GainAmplifier::GAIN_FOUR;  // ±1.024V range
+    custom_config.default_adc_config.data_rate = DataRate::SPS_250;     // 250 SPS
+    custom_config.default_adc_config.mode = OperatingMode::SINGLE_SHOT;
+    
+    printf("Custom configuration:\n");
+    printf("  I2C Baudrate: %lu Hz\n", custom_config.i2c_baudrate);
+    printf("  Device Address: 0x%02X\n", custom_config.device_address);
+    printf("  Alert Pin: %d\n", custom_config.alert_pin);
+    printf("  Power-on Delay: %d ms\n", custom_config.power_on_delay_ms);
+    printf("  Default Gain: %s\n", gainToString(custom_config.default_adc_config.gain));
+    printf("  Default Data Rate: %s\n", dataRateToString(custom_config.default_adc_config.data_rate));
+    
+    // Create device with custom configuration
+    ADS1115Device custom_adc(custom_config);
+    
+    printf("\nInitializing device with custom configuration...\n");
+    Error err = custom_adc.begin(custom_config);
+    
+    if (err == Error::SUCCESS) {
+        printf("Custom device initialized successfully!\n");
+        
+        // Demonstrate reading with custom configuration
+        printf("\nReading with custom configuration:\n");
+        ADCReading reading;
+        err = custom_adc.readChannel(ADCChannel::A0, reading);
+        
+        if (err == Error::SUCCESS) {
+            printf("  Channel A0: %.6f V (Raw: %d)\n", reading.voltage, reading.raw_value);
+            printf("  Gain: %s\n", gainToString(custom_adc.getGain()));
+            printf("  Data Rate: %s\n", dataRateToString(custom_adc.getDataRate()));
+        } else {
+            printf("  Failed to read: %s\n", custom_adc.getErrorString(err));
+        }
+        
+        // Demonstrate runtime configuration updates
+        printf("\nDemonstrating runtime configuration updates:\n");
+        printf("  Updating gain to GAIN_EIGHT...\n");
+        custom_adc.updateGain(GainAmplifier::GAIN_EIGHT);
+        
+        printf("  Updating data rate to SPS_860...\n");
+        custom_adc.updateDataRate(DataRate::SPS_860);
+        
+        err = custom_adc.readChannel(ADCChannel::A0, reading);
+        if (err == Error::SUCCESS) {
+            printf("  Updated reading: %.6f V (Raw: %d)\n", reading.voltage, reading.raw_value);
+            printf("  New Gain: %s\n", gainToString(custom_adc.getGain()));
+            printf("  New Data Rate: %s\n", dataRateToString(custom_adc.getDataRate()));
+        }
+        
+        printf("\nExternal configuration demonstration complete.\n");
+    } else {
+        printf("Failed to initialize custom device: %s\n", custom_adc.getErrorString(err));
+    }
 }
