@@ -102,7 +102,7 @@ constexpr int16_t DEFAULT_LOW_THRESHOLD = 0x8000;   // Maximum negative value
 
 // Timing constants (in milliseconds)
 constexpr uint16_t POWER_ON_DELAY_MS = 25;          // Power-on delay
-constexpr uint16_t CONVERSION_DELAY_MS = 10;        // Conversion delay
+constexpr uint16_t RESET_DELAY_MS = 10;             // Reset stabilization delay
 constexpr uint8_t I2C_TIMEOUT_MS = 100;             // I2C timeout
 
 // Maximum values

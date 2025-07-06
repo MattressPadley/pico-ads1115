@@ -151,7 +151,7 @@ struct DeviceConfig {
     
     // Power Management
     uint16_t power_on_delay_ms = 25;            // Power-on delay in milliseconds
-    uint16_t conversion_delay_ms = 10;          // Conversion delay in milliseconds
+    uint16_t reset_delay_ms = 10;               // Reset stabilization delay in milliseconds
     
     // Default ADC Configuration
     ADCConfig default_adc_config = ADCConfig(); // Default ADC settings
@@ -396,7 +396,7 @@ struct DeviceConfig {
     
     // Power Management
     uint16_t power_on_delay_ms = 25;
-    uint16_t conversion_delay_ms = 10;
+    uint16_t reset_delay_ms = 10;
     
     // Default ADC Configuration
     ADCConfig default_adc_config = ADCConfig();

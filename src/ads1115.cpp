@@ -107,7 +107,7 @@ Error ADS1115Device::reset() {
         return err;
     }
     
-    sleep_ms(CONVERSION_DELAY_MS);
+    sleep_ms(RESET_DELAY_MS);
     
     // Reconfigure with current settings
     return _configureDefaults();

@@ -45,8 +45,8 @@ namespace ADS1115 {
 #define ADS1115_DEFAULT_POWER_ON_DELAY_MS 25
 #endif
 
-#ifndef ADS1115_DEFAULT_CONVERSION_DELAY_MS
-#define ADS1115_DEFAULT_CONVERSION_DELAY_MS 10
+#ifndef ADS1115_DEFAULT_RESET_DELAY_MS
+#define ADS1115_DEFAULT_RESET_DELAY_MS 10
 #endif
 
 // Default I2C Communication Settings
@@ -95,7 +95,7 @@ inline DeviceConfig createDefaultDeviceConfig() {
     config.alert_pin = ADS1115_DEFAULT_ALERT_PIN;
     config.alert_enabled = ADS1115_DEFAULT_ALERT_ENABLED;
     config.power_on_delay_ms = ADS1115_DEFAULT_POWER_ON_DELAY_MS;
-    config.conversion_delay_ms = ADS1115_DEFAULT_CONVERSION_DELAY_MS;
+    config.reset_delay_ms = ADS1115_DEFAULT_RESET_DELAY_MS;
     config.i2c_timeout_ms = ADS1115_DEFAULT_I2C_TIMEOUT_MS;
     config.max_retries = ADS1115_DEFAULT_MAX_RETRIES;
     config.auto_init_i2c = ADS1115_DEFAULT_AUTO_INIT_I2C;
