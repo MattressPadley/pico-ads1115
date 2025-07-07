@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
+# Export compile commands for IDEs and tools
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Include the Pico SDK only if not already available
 if(NOT COMMAND pico_sdk_init)
     # Check if PICO_SDK_PATH is set, otherwise download to build folder
