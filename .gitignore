@@ -70,3 +70,4 @@ docs/html/
 docs/latex/
 compile_commands.json
 .cache/
+.clangd

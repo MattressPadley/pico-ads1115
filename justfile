@@ -5,6 +5,12 @@
 default:
     @just --list
 
+
+# Setup clangd configuration for ARM cross-compilation
+setup-clangd:
+    @echo "Setting up clangd for ARM cross-compilation..."
+    @./scripts/setup-clangd.sh
+
 # Build the project
 build:
     @echo "Building ADS1115 library and examples..."
