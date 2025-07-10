@@ -71,3 +71,6 @@ docs/latex/
 compile_commands.json
 .cache/
 .clangd
+
+# Doxygen generated files
+*.tag

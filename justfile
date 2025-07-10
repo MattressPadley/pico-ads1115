@@ -5,6 +5,12 @@
 default:
     @just --list
 
+# Generate all: build project and documentation
+all: build docs
+    @echo "Build and documentation generation complete!"
+    @echo "Binary files in build/ directory"
+    @echo "Documentation in docs/html/ directory"
+
 
 # Setup clangd configuration for ARM cross-compilation
 setup-clangd:
@@ -75,3 +81,32 @@ test-build: build
     @echo "Starting serial monitor..."
     @echo "Press Ctrl+A then Ctrl+X to exit monitoring"
     @picocom -b 115200 --imap lfcrlf /dev/cu.usbmodem*
+
+# Generate documentation with Doxygen
+docs:
+    @echo "Generating documentation with Doxygen..."
+    @if ! command -v doxygen >/dev/null 2>&1; then \
+        echo "Error: Doxygen not found. Please install doxygen:"; \
+        echo "  macOS: brew install doxygen"; \
+        echo "  Ubuntu/Debian: sudo apt-get install doxygen"; \
+        echo "  Windows: Download from doxygen.nl"; \
+        exit 1; \
+    fi
+    @doxygen Doxyfile
+    @echo "Documentation generated in docs/html/"
+    @echo "Open docs/html/index.html in your browser to view"
+
+# Clean documentation
+clean-docs:
+    @echo "Cleaning generated documentation..."
+    @rm -rf docs/
+    @echo "Documentation cleaned!"
+
+# Open documentation in browser (macOS)
+open-docs: docs
+    @echo "Opening documentation in browser..."
+    @open docs/html/index.html
+
+# Full clean: build and docs
+full-clean: clean clean-docs
+    @echo "Full clean complete!"
