@@ -12,6 +12,7 @@
 
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
+#include "ads1115_types.hpp"
 
 /**
  * @namespace ADS1115

@@ -128,9 +128,11 @@ target_compile_definitions(ads1115 PRIVATE
     ADS1115_VERSION_PATCH=0
 )
 
-# Add version information to the example
-target_compile_definitions(basic_adc PRIVATE
-    ADS1115_VERSION_MAJOR=0
-    ADS1115_VERSION_MINOR=1
-    ADS1115_VERSION_PATCH=0
-)
+# Add version information to the example (only when building as main project)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  target_compile_definitions(basic_adc PRIVATE
+      ADS1115_VERSION_MAJOR=0
+      ADS1115_VERSION_MINOR=1
+      ADS1115_VERSION_PATCH=0
+  )
+endif()
