@@ -35,7 +35,7 @@ endif()
 # Only configure project if we're the top-level project
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   # Project configuration
-  project(pico_ads1115 C CXX ASM)
+  project(ads1115 VERSION 0.0.1 LANGUAGES C CXX ASM)
   set(CMAKE_C_STANDARD 11)
   set(CMAKE_CXX_STANDARD 17)
 
@@ -123,16 +123,16 @@ install(DIRECTORY include/
 
 # Add compile definitions
 target_compile_definitions(ads1115 PRIVATE
-    ADS1115_VERSION_MAJOR=0
-    ADS1115_VERSION_MINOR=1
-    ADS1115_VERSION_PATCH=0
+    ADS1115_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    ADS1115_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    ADS1115_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 # Add version information to the example (only when building as main project)
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   target_compile_definitions(basic_adc PRIVATE
-      ADS1115_VERSION_MAJOR=0
-      ADS1115_VERSION_MINOR=1
-      ADS1115_VERSION_PATCH=0
+      ADS1115_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+      ADS1115_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+      ADS1115_VERSION_PATCH=${PROJECT_VERSION_PATCH}
   )
 endif()

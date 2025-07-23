@@ -10,7 +10,8 @@
  * @subsection Architecture Architecture Overview
  * - **State Machine**: Device maintains initialization state and mode tracking
  * - **Error Propagation**: All I2C errors bubble up through Error enum
- * - **Configuration Caching**: Device config cached locally to minimize I2C reads
+ * - **Configuration Caching**: Device config cached locally to minimize I2C
+ * reads
  * - **Timeout Protection**: All blocking operations have configurable timeouts
  *
  * @subsection I2C_Implementation I2C Communication Strategy
@@ -53,7 +54,6 @@
  * - No built-in calibration for offset/gain errors
  *
  * @author Your Name
- * @version 0.1.0
  * @date 2025
  */
 
