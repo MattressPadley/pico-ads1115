@@ -35,7 +35,7 @@ endif()
 # Only configure project if we're the top-level project
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   # Project configuration
-  project(ads1115 VERSION 0.0.1 LANGUAGES C CXX ASM)
+  project(ads1115 VERSION 0.1.0 LANGUAGES C CXX ASM)
   set(CMAKE_C_STANDARD 11)
   set(CMAKE_CXX_STANDARD 17)
 
